@@ -38,9 +38,35 @@ export function ImageScanner() {
 
       const data = await response.json()
       console.log("Image backend response:", data)
-      setResult(data)
+
+      if (!response.ok) {
+        setResult({
+          extractedText: "",
+          mode,
+          riskScore: 0,
+          status: "suspicious",
+          reasons: [data.detail || "Image analysis failed"],
+        })
+        return
+      }
+
+      setResult({
+        extractedText: data.extractedText || "",
+        mode: data.mode || mode,
+        riskScore: data.riskScore || 0,
+        status: data.status || "suspicious",
+        reasons: Array.isArray(data.reasons) ? data.reasons : ["No analysis details available"],
+      })
     } catch (error) {
       console.error("Image scan error:", error)
+
+      setResult({
+        extractedText: "",
+        mode,
+        riskScore: 0,
+        status: "suspicious",
+        reasons: ["Could not connect to image analysis server"],
+      })
     } finally {
       setIsScanning(false)
     }
