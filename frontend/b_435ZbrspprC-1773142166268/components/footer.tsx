@@ -16,6 +16,7 @@ export function Footer() {
               </p>
             </div>
           </div>
+
           <div className="flex items-start gap-3">
             <div className="p-2 rounded-lg bg-accent/10 text-accent">
               <Lock className="h-5 w-5" />
@@ -27,6 +28,7 @@ export function Footer() {
               </p>
             </div>
           </div>
+
           <div className="flex items-start gap-3">
             <div className="p-2 rounded-lg bg-primary/10 text-primary">
               <Eye className="h-5 w-5" />
@@ -39,7 +41,7 @@ export function Footer() {
             </div>
           </div>
         </div>
-        
+
         <div className="border-t border-border pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
@@ -47,9 +49,21 @@ export function Footer() {
               Scam<span className="text-primary">Guard</span>
             </span>
           </div>
-          <p className="text-sm text-muted-foreground text-center md:text-right">
-            A cybersecurity tool for detecting and preventing online scams, phishing, and fraud.
-          </p>
+
+          <div className="text-sm text-muted-foreground text-center md:text-right">
+            <p>
+              A cybersecurity tool for detecting and preventing online scams, phishing, and fraud.
+            </p>
+            <p className="mt-1">
+              Developed by <span className="text-foreground font-medium">Yam Mana</span> • Support & feedback:{" "}
+              <a
+                href="mailto:yammana37@gmail.com"
+                className="text-primary hover:underline"
+              >
+                yammana37@gmail.com
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </footer>
