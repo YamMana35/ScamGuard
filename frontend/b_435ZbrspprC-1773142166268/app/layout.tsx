@@ -7,12 +7,54 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://scam-guard-umber.vercel.app"),
   title: 'ScamGuard - Detect Phishing & Scams',
-  description: 'Protect yourself from phishing websites, scam emails, and suspicious messages with AI-powered security scanning.',
+  description:
+    'Protect yourself from phishing websites, scam emails, suspicious messages, and screenshot-based scams with AI-powered security scanning.',
   generator: 'v0.app',
+  applicationName: 'ScamGuard',
+  keywords: [
+    'phishing detector',
+    'scam detector',
+    'cybersecurity',
+    'email scam checker',
+    'sms scam detector',
+    'fake link checker',
+    'screenshot phishing detector',
+    'online fraud protection',
+    'ScamGuard',
+  ],
+  authors: [{ name: 'Yam Mana', url: 'https://scam-guard-umber.vercel.app' }],
+  creator: 'Yam Mana',
+  publisher: 'Yam Mana',
   icons: {
     icon: '/logo.png',
     apple: '/logo.png',
+    shortcut: '/logo.png',
+  },
+  openGraph: {
+    title: 'ScamGuard - Detect Phishing & Scams',
+    description:
+      'Analyze suspicious websites, scam emails, messages, and screenshots with ScamGuard.',
+    url: 'https://scam-guard-umber.vercel.app',
+    siteName: 'ScamGuard',
+    images: [
+      {
+        url: '/logo.png',
+        width: 512,
+        height: 512,
+        alt: 'ScamGuard logo',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ScamGuard - Detect Phishing & Scams',
+    description:
+      'Analyze suspicious websites, emails, messages, and screenshots with ScamGuard.',
+    images: ['/logo.png'],
   },
 }
 
