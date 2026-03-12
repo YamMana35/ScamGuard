@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+python-whois
+python-multipart
+pillow
+pytesseract
