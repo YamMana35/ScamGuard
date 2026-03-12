@@ -31,7 +31,7 @@ export function ImageScanner() {
       formData.append("file", file)
       formData.append("mode", mode)
 
-      const response = await fetch("http://127.0.0.1:8000/analyze-image", {
+      const response = await fetch("https://scamguard-ikr1.onrender.com/analyze-image", {
         method: "POST",
         body: formData,
       })
