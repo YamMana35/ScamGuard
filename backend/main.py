@@ -10,6 +10,9 @@ import io
 import os
 import platform
 import shutil
+import time
+import hashlib
+from urllib.parse import urlparse
 
 app = FastAPI()
 
@@ -21,10 +24,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Cross-platform Tesseract setup:
-# 1. If TESSERACT_CMD env var exists, use it
-# 2. On Windows, try the common install path
-# 3. On Linux/Render, use the system binary if installed
 custom_tesseract = os.getenv("TESSERACT_CMD")
 
 if custom_tesseract:
@@ -46,6 +45,44 @@ class URLRequest(BaseModel):
 
 class TextRequest(BaseModel):
     text: str
+
+
+# -----------------------------
+# Simple in-memory caches
+# -----------------------------
+CACHE_TTL_SECONDS = 60 * 10  # 10 minutes
+
+whois_cache = {}
+url_analysis_cache = {}
+text_analysis_cache = {}
+
+
+def get_cache(cache: dict, key: str):
+    item = cache.get(key)
+    if not item:
+        return None
+
+    if time.time() - item["ts"] > CACHE_TTL_SECONDS:
+        cache.pop(key, None)
+        return None
+
+    return item["value"]
+
+
+def set_cache(cache: dict, key: str, value):
+    cache[key] = {
+        "ts": time.time(),
+        "value": value
+    }
+
+
+def sha_key(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def extract_domain(url: str) -> str:
+    parsed = urlparse(url if url.startswith(("http://", "https://")) else f"http://{url}")
+    return parsed.netloc or url.replace("https://", "").replace("http://", "").split("/")[0]
 
 
 def classify_risk(risk: int) -> str:
@@ -70,8 +107,14 @@ def extract_urls(text: str):
 
 
 def check_domain_age(url: str):
+    domain = extract_domain(url)
+    cache_key = domain.lower()
+
+    cached = get_cache(whois_cache, cache_key)
+    if cached is not None:
+        return cached
+
     try:
-        domain = url.replace("https://", "").replace("http://", "").split("/")[0]
         w = whois.whois(domain)
         creation = w.creation_date
 
@@ -79,15 +122,23 @@ def check_domain_age(url: str):
             creation = creation[0]
 
         if creation is None:
+            set_cache(whois_cache, cache_key, None)
             return None
 
         age_days = (datetime.now() - creation).days
+        set_cache(whois_cache, cache_key, age_days)
         return age_days
     except:
+        set_cache(whois_cache, cache_key, None)
         return None
 
 
 def score_url(url: str):
+    cache_key = sha_key(url.strip().lower())
+    cached = get_cache(url_analysis_cache, cache_key)
+    if cached is not None:
+        return cached
+
     risk = 0
     reasons = []
 
@@ -118,11 +169,14 @@ def score_url(url: str):
         risk += min(30, len(found) * 6)
         reasons.append("URL contains suspicious phishing-style words")
 
-    return {
+    result = {
         "riskScore": min(risk, 100),
         "status": classify_risk(risk),
         "reasons": reasons if reasons else ["No obvious phishing indicators detected"]
     }
+
+    set_cache(url_analysis_cache, cache_key, result)
+    return result
 
 
 def add_category_score(text_original: str, text_normalized: str, keywords, weight, label, reasons, current_risk):
@@ -140,6 +194,11 @@ def add_category_score(text_original: str, text_normalized: str, keywords, weigh
 
 
 def analyze_text_content(text: str, mode="email"):
+    cache_key = sha_key(f"{mode}::{text.strip()}")
+    cached = get_cache(text_analysis_cache, cache_key)
+    if cached is not None:
+        return cached
+
     original_text = text
     normalized = normalize_text(text)
 
@@ -292,11 +351,14 @@ def analyze_text_content(text: str, mode="email"):
 
     final_risk = min(risk, 100)
 
-    return {
+    result = {
         "riskScore": final_risk,
         "status": classify_risk(final_risk),
         "reasons": unique_reasons
     }
+
+    set_cache(text_analysis_cache, cache_key, result)
+    return result
 
 
 def extract_text_from_image_bytes(image_bytes: bytes) -> str:
