@@ -7,6 +7,9 @@ import re
 from PIL import Image, ImageEnhance, ImageFilter
 import pytesseract
 import io
+import os
+import platform
+import shutil
 
 app = FastAPI()
 
@@ -18,7 +21,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# Cross-platform Tesseract setup:
+# 1. If TESSERACT_CMD env var exists, use it
+# 2. On Windows, try the common install path
+# 3. On Linux/Render, use the system binary if installed
+custom_tesseract = os.getenv("TESSERACT_CMD")
+
+if custom_tesseract:
+    pytesseract.pytesseract.tesseract_cmd = custom_tesseract
+else:
+    if platform.system() == "Windows":
+        windows_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        if os.path.exists(windows_path):
+            pytesseract.pytesseract.tesseract_cmd = windows_path
+    else:
+        linux_tesseract = shutil.which("tesseract")
+        if linux_tesseract:
+            pytesseract.pytesseract.tesseract_cmd = linux_tesseract
 
 
 class URLRequest(BaseModel):
@@ -294,6 +313,11 @@ def extract_text_from_image_bytes(image_bytes: bytes) -> str:
         config="--psm 6"
     )
     return text.strip()
+
+
+@app.get("/")
+def healthcheck():
+    return {"status": "ok", "service": "ScamGuard API"}
 
 
 @app.post("/analyze")
