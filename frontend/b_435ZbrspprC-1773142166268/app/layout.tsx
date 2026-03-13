@@ -62,8 +62,35 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ScamGuard",
+    "url": "https://scam-guard-umber.vercel.app",
+    "applicationCategory": "SecurityApplication",
+    "operatingSystem": "Web",
+    "description": "ScamGuard is a cybersecurity tool that detects phishing websites, scam emails, fake SMS messages, and suspicious screenshots.",
+    "creator": {
+      "@type": "Person",
+      "name": "Yam Mana"
+    },
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  }
+
   return (
     <html lang="en">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
+      </head>
+
       <body className="font-sans antialiased">
         {children}
         <Analytics />
