@@ -27,10 +27,14 @@ export const metadata: Metadata = {
   creator: 'Yam Mana',
   publisher: 'Yam Mana',
   icons: {
-    icon: '/favicon.png',
-    apple: '/favicon.png',
-    shortcut: '/favicon.png',
-  },
+  icon: [
+    { url: "/logo.png", sizes: "64x64", type: "image/png" },
+    { url: "/logo.png", sizes: "128x128", type: "image/png" },
+  ],
+  apple: "/logo.png",
+  shortcut: "/logo.png",
+},
+
   openGraph: {
     title: 'ScamGuard - Detect Phishing & Scams',
     description:
