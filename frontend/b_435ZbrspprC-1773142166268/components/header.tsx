@@ -23,12 +23,12 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
           <div className="flex items-center gap-3">
             <div className="relative flex items-center justify-center">
               <Image
-                src="/logo.png"
-                alt="ScamGuard logo"
-                width={56}
-                height={56}
-                priority
-                className="drop-shadow-[0_0_12px_rgba(34,197,94,0.8)]"
+               src="/logo.png"
+               alt="ScamGuard logo"
+               width={72}
+               height={72}
+               priority
+               className="drop-shadow-[0_0_14px_rgba(34,197,94,0.85)]"
               />
             </div>
 
