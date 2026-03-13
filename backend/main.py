@@ -53,6 +53,58 @@ whois_cache = {}
 url_analysis_cache = {}
 text_analysis_cache = {}
 
+TRUSTED_DOMAINS = [
+    "google.com",
+    "microsoft.com",
+    "apple.com",
+    "amazon.com",
+    "paypal.com",
+    "github.com",
+    "facebook.com",
+    "instagram.com",
+    "linkedin.com",
+    "x.com",
+    "twitter.com",
+    "whatsapp.com",
+    "telegram.org",
+    "openai.com",
+    "vercel.com",
+    "cloudflare.com",
+    "gitlab.com",
+    "dropbox.com",
+    "adobe.com",
+    "netflix.com",
+    "discord.com",
+    "slack.com",
+]
+
+TRUSTED_BRAND_DOMAINS = {
+    "paypal": ["paypal.com"],
+    "apple": ["apple.com"],
+    "microsoft": ["microsoft.com", "live.com", "office.com", "outlook.com"],
+    "google": ["google.com", "gmail.com", "youtube.com"],
+    "amazon": ["amazon.com", "amazonaws.com"],
+    "facebook": ["facebook.com", "fb.com", "messenger.com"],
+    "instagram": ["instagram.com"],
+    "whatsapp": ["whatsapp.com"],
+    "telegram": ["telegram.org"],
+    "github": ["github.com"],
+    "bank": [],
+    "visa": ["visa.com"],
+    "mastercard": ["mastercard.com"],
+    "netflix": ["netflix.com"],
+}
+
+CRITICAL_PHISHING_KEYWORDS = [
+    "password", "otp", "verification code", "security code",
+    "credit card", "bank account", "login", "sign in",
+    "verify your account", "confirm your identity", "payment",
+    "pay now", "refund", "update payment", "billing",
+    "סיסמה", "קוד אימות", "קוד חד פעמי", "כרטיס אשראי",
+    "חשבון בנק", "התחבר", "אימות", "אשר את זהותך",
+    "תשלום", "שלם עכשיו", "עדכן פרטים", "חיוב"
+]
+
 
 def get_cache(cache: dict, key: str):
     item = cache.get(key)
@@ -79,7 +131,8 @@ def sha_key(value: str) -> str:
 
 def extract_domain(url: str) -> str:
     parsed = urlparse(url if url.startswith(("http://", "https://")) else f"http://{url}")
-    return parsed.netloc or url.replace("https://", "").replace("http://", "").split("/")[0]
+    domain = parsed.netloc or url.replace("https://", "").replace("http://", "").split("/")[0]
+    return domain.replace("www.", "").lower()
 
 
 def classify_risk(risk: int) -> str:
@@ -101,6 +154,27 @@ def extract_urls(text: str):
     pattern = r'((?:https?://)?(?:www\.)?[a-zA-Z0-9\-]+\.[a-zA-Z]{2,}(?:/[^\s]*)?)'
     matches = re.findall(pattern, text, flags=re.IGNORECASE)
     return matches
+
+
+def is_trusted_domain(domain: str) -> bool:
+    domain = domain.replace("www.", "").lower()
+    return any(domain == trusted or domain.endswith(f".{trusted}") for trusted in TRUSTED_DOMAINS)
+
+
+def brand_matches_legitimate_domain(brand: str, domain: str) -> bool:
+    domain = domain.replace("www.", "").lower()
+    allowed_domains = TRUSTED_BRAND_DOMAINS.get(brand, [])
+    return any(domain == allowed or domain.endswith(f".{allowed}") for allowed in allowed_domains)
+
+
+def extract_brand_hits(value: str):
+    brands = list(TRUSTED_BRAND_DOMAINS.keys())
+    lowered = value.lower()
+    return [brand for brand in brands if brand in lowered]
+
+
+def contains_critical_keyword(normalized_text: str) -> bool:
+    return any(keyword.lower() in normalized_text for keyword in CRITICAL_PHISHING_KEYWORDS)
 
 
 def check_domain_age(url: str):
@@ -131,7 +205,8 @@ def check_domain_age(url: str):
 
 
 def score_url(url: str):
-    cache_key = sha_key(url.strip().lower())
+    normalized_url_input = url.strip().lower()
+    cache_key = sha_key(normalized_url_input)
     cached = get_cache(url_analysis_cache, cache_key)
     if cached is not None:
         return cached
@@ -139,8 +214,17 @@ def score_url(url: str):
     risk = 0
     reasons = []
 
-    lower_url = url.lower()
-    domain = extract_domain(url).lower()
+    lower_url = normalized_url_input
+    domain = extract_domain(url)
+
+    if is_trusted_domain(domain):
+        result = {
+            "riskScore": 0,
+            "status": "safe",
+            "reasons": ["Trusted domain"]
+        }
+        set_cache(url_analysis_cache, cache_key, result)
+        return result
 
     suspicious_words = [
         "login", "verify", "secure", "account", "bank", "update",
@@ -152,12 +236,6 @@ def score_url(url: str):
     suspicious_tlds = [
         ".xyz", ".top", ".click", ".shop", ".live", ".pw", ".sbs",
         ".buzz", ".monster", ".work", ".quest", ".rest", ".country"
-    ]
-
-    trusted_brands = [
-        "paypal", "apple", "microsoft", "google", "amazon",
-        "facebook", "instagram", "whatsapp", "telegram",
-        "bank", "visa", "mastercard"
     ]
 
     shorteners = [
@@ -173,15 +251,15 @@ def score_url(url: str):
         risk += 20
         reasons.append("Domain is relatively new")
 
-    if "@" in url:
+    if "@" in lower_url:
         risk += 20
         reasons.append("URL contains suspicious character @")
 
-    if len(url) > 75:
+    if len(lower_url) > 75:
         risk += 12
         reasons.append("URL is unusually long")
 
-    if url.startswith("http://"):
+    if lower_url.startswith("http://"):
         risk += 18
         reasons.append("URL does not use HTTPS")
 
@@ -190,7 +268,7 @@ def score_url(url: str):
         risk += min(30, len(found_words) * 6)
         reasons.append("URL contains phishing-style keywords")
 
-    if any(tld in domain for tld in suspicious_tlds):
+    if any(domain.endswith(tld) for tld in suspicious_tlds):
         risk += 18
         reasons.append("Domain uses a commonly abused TLD")
 
@@ -211,18 +289,19 @@ def score_url(url: str):
         risk += 10
         reasons.append("Domain contains numeric characters")
 
-    if any(shortener in domain for shortener in shorteners):
+    if any(shortener == domain or domain.endswith(f".{shortener}") for shortener in shorteners):
         risk += 20
         reasons.append("Domain is a shortened or redirect-style link")
 
-    brand_hits = [brand for brand in trusted_brands if brand in domain]
+    brand_hits = extract_brand_hits(domain)
     if brand_hits:
-        risk += 10
-        reasons.append("Domain references a well-known brand")
-
-        if found_words:
-            risk += 20
-            reasons.append("Brand name appears together with phishing keywords")
+        for brand in brand_hits:
+            if not brand_matches_legitimate_domain(brand, domain):
+                risk += 25
+                reasons.append(f"Domain references brand '{brand}' outside its legitimate domain")
+                if found_words:
+                    risk += 20
+                    reasons.append("Brand name appears together with phishing keywords")
 
     lookalike_patterns = [
         r"paypa1", r"micr0soft", r"g00gle", r"app1e",
@@ -245,9 +324,11 @@ def score_url(url: str):
         if reason not in unique_reasons:
             unique_reasons.append(reason)
 
+    final_risk = max(0, min(risk, 100))
+
     result = {
-        "riskScore": min(risk, 100),
-        "status": classify_risk(risk),
+        "riskScore": final_risk,
+        "status": classify_risk(final_risk),
         "reasons": unique_reasons if unique_reasons else ["No obvious phishing indicators detected"]
     }
 
@@ -343,10 +424,10 @@ def analyze_text_content(text: str, mode="email"):
 
     brand_keywords = [
         "paypal", "apple", "microsoft", "google", "amazon",
-        "facebook", "instagram", "whatsapp", "telegram",
+        "facebook", "instagram", "whatsapp", "telegram", "github",
         "bank", "visa", "mastercard", "netflix",
         "פייפאל", "אפל", "מיקרוסופט", "גוגל", "אמזון",
-        "פייסבוק", "אינסטגרם", "וואטסאפ", "טלגרם",
+        "פייסבוק", "אינסטגרם", "וואטסאפ", "טלגרם", "גיטהאב",
         "בנק", "ויזה", "מאסטרקארד", "נטפליקס"
     ]
 
@@ -371,6 +452,13 @@ def analyze_text_content(text: str, mode="email"):
         "m-r.pw", "rb.gy", "is.gd", "cutt.ly"
     ]
 
+    security_notice_keywords = [
+        "security log", "recently authorized", "authorized to access your account",
+        "permissions", "for more information", "contact support", "visit",
+        "security event", "security events",
+        "יומן אבטחה", "מורשה לאחרונה", "הרשאה לחשבון", "פרטי אבטחה"
+    ]
+
     risk = add_category_score(original_text, normalized, urgency_keywords, 15, "Urgency language detected", reasons, risk)
     risk = add_category_score(original_text, normalized, action_keywords, 14, "Action request detected", reasons, risk)
     risk = add_category_score(original_text, normalized, credential_keywords, 18, "Sensitive information request", reasons, risk)
@@ -393,12 +481,22 @@ def analyze_text_content(text: str, mode="email"):
     urls = extract_urls(original_text)
     has_link = len(urls) > 0
 
+    trusted_link_count = 0
+    untrusted_link_count = 0
+
     if urls:
-        risk += 25
+        risk += 15
         reasons.append(f"Contains {len(urls)} link(s)")
 
-        for url in urls[:3]:
+        for url in urls[:5]:
             lower_url = url.lower()
+            normalized_url = url if lower_url.startswith("http") else f"http://{url}"
+            linked_domain = extract_domain(normalized_url)
+
+            if is_trusted_domain(linked_domain):
+                trusted_link_count += 1
+            else:
+                untrusted_link_count += 1
 
             if any(shortener in lower_url for shortener in shorteners):
                 risk += 25
@@ -416,11 +514,11 @@ def analyze_text_content(text: str, mode="email"):
                 risk += 15
                 reasons.append("Contains non-HTTPS link")
 
-            normalized_url = url if lower_url.startswith("http") else f"http://{url}"
-            age = check_domain_age(normalized_url)
-            if age is not None and age < 30:
-                risk += 15
-                reasons.append("Linked domain appears newly registered")
+            if not is_trusted_domain(linked_domain):
+                age = check_domain_age(normalized_url)
+                if age is not None and age < 30:
+                    risk += 15
+                    reasons.append("Linked domain appears newly registered")
 
     if re.search(r'\b\d{4,8}\b', original_text):
         risk += 6
@@ -439,6 +537,8 @@ def analyze_text_content(text: str, mode="email"):
     has_credentials = any(word in normalized or word in original_text for word in credential_keywords)
     has_brand = any(word in normalized or word in original_text for word in brand_keywords)
     has_threat = any(word in normalized or word in original_text for word in threat_keywords)
+    has_critical = contains_critical_keyword(normalized)
+    has_security_notice = any(word in normalized or word in original_text for word in security_notice_keywords)
 
     if mode == "message" and has_transport and has_payment and has_link:
         risk += 30
@@ -468,6 +568,28 @@ def analyze_text_content(text: str, mode="email"):
         risk += 15
         reasons.append("Threat language combined with a link is suspicious")
 
+    # False-positive reduction for legitimate security notifications
+    if mode == "email":
+        if trusted_link_count > 0 and untrusted_link_count == 0:
+            risk -= 18
+            reasons.append("All detected links point to trusted domains")
+
+        if has_security_notice and trusted_link_count > 0 and not has_payment and not has_debt:
+            risk -= 20
+            reasons.append("Looks like a legitimate security notification")
+
+        if has_brand and trusted_link_count > 0 and not has_critical and not has_payment:
+            risk -= 15
+            reasons.append("Brand mention appears together with trusted links only")
+
+        if "github" in normalized and trusted_link_count > 0 and "github.com" in original_text.lower():
+            risk -= 15
+            reasons.append("GitHub-related trusted links detected")
+
+        if not has_critical and trusted_link_count > 0 and untrusted_link_count == 0:
+            risk -= 10
+            reasons.append("No critical phishing keywords detected alongside trusted links")
+
     if risk == 0:
         reasons.append("No obvious phishing indicators detected")
 
@@ -476,7 +598,7 @@ def analyze_text_content(text: str, mode="email"):
         if reason not in unique_reasons:
             unique_reasons.append(reason)
 
-    final_risk = min(risk, 100)
+    final_risk = max(0, min(risk, 100))
 
     result = {
         "riskScore": final_risk,
