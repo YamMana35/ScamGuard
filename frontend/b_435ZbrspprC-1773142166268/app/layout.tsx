@@ -8,9 +8,8 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://scam-guard-umber.vercel.app"),
-  title: 'ScamGuard - Detect Phishing & Scams',
-  description:
-    'Protect yourself from phishing websites, scam emails, suspicious messages, and screenshot-based scams with AI-powered security scanning.',
+  title: 'ScamGuard - Free Phishing Detector for Links, Emails, Messages and Screenshots',
+  description: 'ScamGuard is a free phishing detector that scans suspicious links, scam emails, fake SMS messages, and screenshots using AI-powered analysis.',
   generator: 'v0.app',
   applicationName: 'ScamGuard',
   keywords: [
