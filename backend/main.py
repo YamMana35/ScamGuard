@@ -142,37 +142,119 @@ def score_url(url: str):
     risk = 0
     reasons = []
 
+    lower_url = url.lower()
+    domain = extract_domain(url).lower()
+
+    suspicious_words = [
+        "login", "verify", "secure", "account", "bank", "update",
+        "confirm", "password", "payment", "signin", "refund",
+        "tax", "support", "alert", "security", "invoice", "wallet",
+        "billing", "recovery", "unlock", "validate"
+    ]
+
+    suspicious_tlds = [
+        ".xyz", ".top", ".click", ".shop", ".live", ".pw", ".sbs",
+        ".buzz", ".monster", ".work", ".quest", ".rest", ".country"
+    ]
+
+    trusted_brands = [
+        "paypal", "apple", "microsoft", "google", "amazon",
+        "facebook", "instagram", "whatsapp", "telegram",
+        "bank", "visa", "mastercard"
+    ]
+
+    shorteners = [
+        "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly",
+        "rb.gy", "is.gd", "cutt.ly", "m-r.pw", "rb.gy"
+    ]
+
     age = check_domain_age(url)
     if age is not None and age < 30:
-        risk += 40
+        risk += 35
         reasons.append("Domain was created recently")
+    elif age is not None and age < 90:
+        risk += 20
+        reasons.append("Domain is relatively new")
 
     if "@" in url:
         risk += 20
         reasons.append("URL contains suspicious character @")
 
     if len(url) > 75:
-        risk += 10
+        risk += 12
         reasons.append("URL is unusually long")
 
     if url.startswith("http://"):
-        risk += 15
+        risk += 18
         reasons.append("URL does not use HTTPS")
 
-    suspicious_words = [
-        "login", "verify", "secure", "account", "bank", "update",
-        "confirm", "password", "payment", "signin", "refund",
-        "tax", "support", "alert", "security", "invoice"
+    found_words = [word for word in suspicious_words if word in lower_url]
+    if found_words:
+        risk += min(30, len(found_words) * 6)
+        reasons.append("URL contains phishing-style keywords")
+
+    if any(tld in domain for tld in suspicious_tlds):
+        risk += 18
+        reasons.append("Domain uses a commonly abused TLD")
+
+    hyphen_count = domain.count("-")
+    if hyphen_count >= 2:
+        risk += 15
+        reasons.append("Domain contains multiple hyphens")
+    elif hyphen_count == 1:
+        risk += 8
+        reasons.append("Domain contains a hyphen")
+
+    dot_count = domain.count(".")
+    if dot_count >= 3:
+        risk += 12
+        reasons.append("Domain contains many subdomains")
+
+    if re.search(r'\d', domain):
+        risk += 10
+        reasons.append("Domain contains numeric characters")
+
+    if any(shortener in domain for shortener in shorteners):
+        risk += 20
+        reasons.append("Domain is a shortened or redirect-style link")
+
+    brand_hits = [brand for brand in trusted_brands if brand in domain]
+    if brand_hits:
+        risk += 10
+        reasons.append("Domain references a well-known brand")
+
+        # אם יש גם מותג וגם מילות פישינג, זה הרבה יותר מסוכן
+        if found_words:
+            risk += 20
+            reasons.append("Brand name appears together with phishing keywords")
+
+    # סימנים של התחזות כמו paypa1 / micr0soft / g00gle
+    lookalike_patterns = [
+        r"paypa1", r"micr0soft", r"g00gle", r"app1e",
+        r"faceb00k", r"amaz0n", r"instagrarn", r"te1egram"
     ]
-    found = [word for word in suspicious_words if word in url.lower()]
-    if found:
-        risk += min(30, len(found) * 6)
-        reasons.append("URL contains suspicious phishing-style words")
+    if any(re.search(pattern, domain) for pattern in lookalike_patterns):
+        risk += 25
+        reasons.append("Domain resembles a known brand using deceptive spelling")
+
+    # URL path חשוד
+    suspicious_path_patterns = [
+        "/login", "/verify", "/signin", "/secure", "/account",
+        "/update", "/payment", "/invoice", "/billing", "/confirm"
+    ]
+    if any(pattern in lower_url for pattern in suspicious_path_patterns):
+        risk += 12
+        reasons.append("URL path suggests credential or payment targeting")
+
+    unique_reasons = []
+    for reason in reasons:
+        if reason not in unique_reasons:
+            unique_reasons.append(reason)
 
     result = {
         "riskScore": min(risk, 100),
         "status": classify_risk(risk),
-        "reasons": reasons if reasons else ["No obvious phishing indicators detected"]
+        "reasons": unique_reasons if unique_reasons else ["No obvious phishing indicators detected"]
     }
 
     set_cache(url_analysis_cache, cache_key, result)
