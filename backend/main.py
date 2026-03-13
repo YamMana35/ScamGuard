@@ -47,10 +47,7 @@ class TextRequest(BaseModel):
     text: str
 
 
-# -----------------------------
-# Simple in-memory caches
-# -----------------------------
-CACHE_TTL_SECONDS = 60 * 10  # 10 minutes
+CACHE_TTL_SECONDS = 60 * 10
 
 whois_cache = {}
 url_analysis_cache = {}
@@ -165,7 +162,7 @@ def score_url(url: str):
 
     shorteners = [
         "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly",
-        "rb.gy", "is.gd", "cutt.ly", "m-r.pw", "rb.gy"
+        "rb.gy", "is.gd", "cutt.ly", "m-r.pw"
     ]
 
     age = check_domain_age(url)
@@ -223,12 +220,10 @@ def score_url(url: str):
         risk += 10
         reasons.append("Domain references a well-known brand")
 
-        # אם יש גם מותג וגם מילות פישינג, זה הרבה יותר מסוכן
         if found_words:
             risk += 20
             reasons.append("Brand name appears together with phishing keywords")
 
-    # סימנים של התחזות כמו paypa1 / micr0soft / g00gle
     lookalike_patterns = [
         r"paypa1", r"micr0soft", r"g00gle", r"app1e",
         r"faceb00k", r"amaz0n", r"instagrarn", r"te1egram"
@@ -237,7 +232,6 @@ def score_url(url: str):
         risk += 25
         reasons.append("Domain resembles a known brand using deceptive spelling")
 
-    # URL path חשוד
     suspicious_path_patterns = [
         "/login", "/verify", "/signin", "/secure", "/account",
         "/update", "/payment", "/invoice", "/billing", "/confirm"
@@ -347,6 +341,31 @@ def analyze_text_content(text: str, mode="email"):
         "משרד", "רשות", "הודעה רשמית", "הודעה מטעם", "גורם ממשלתי"
     ]
 
+    brand_keywords = [
+        "paypal", "apple", "microsoft", "google", "amazon",
+        "facebook", "instagram", "whatsapp", "telegram",
+        "bank", "visa", "mastercard", "netflix",
+        "פייפאל", "אפל", "מיקרוסופט", "גוגל", "אמזון",
+        "פייסבוק", "אינסטגרם", "וואטסאפ", "טלגרם",
+        "בנק", "ויזה", "מאסטרקארד", "נטפליקס"
+    ]
+
+    account_keywords = [
+        "account suspended", "account locked", "account disabled",
+        "verify your account", "confirm your identity", "security alert",
+        "חשבון נחסם", "החשבון ייחסם", "החשבון הושעה",
+        "אמת את החשבון", "אשר את זהותך", "התראת אבטחה"
+    ]
+
+    refund_keywords = [
+        "refund available", "claim your refund", "tax refund", "payment failed",
+        "החזר זמין", "קבל את ההחזר", "החזר מס", "התשלום נכשל"
+    ]
+
+    attachment_keywords = [
+        ".html", ".htm", ".zip", ".rar", ".exe", ".docm", ".xlsm"
+    ]
+
     shorteners = [
         "bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly",
         "m-r.pw", "rb.gy", "is.gd", "cutt.ly"
@@ -361,6 +380,10 @@ def analyze_text_content(text: str, mode="email"):
     risk = add_category_score(original_text, normalized, tax_keywords, 24, "Tax/refund scam language detected", reasons, risk)
     risk = add_category_score(original_text, normalized, transport_keywords, 20, "Transport/toll scam language detected", reasons, risk)
     risk = add_category_score(original_text, normalized, government_keywords, 12, "Authority/government style language detected", reasons, risk)
+    risk = add_category_score(original_text, normalized, brand_keywords, 10, "Known brand or institution mentioned", reasons, risk)
+    risk = add_category_score(original_text, normalized, account_keywords, 18, "Account compromise language detected", reasons, risk)
+    risk = add_category_score(original_text, normalized, refund_keywords, 18, "Refund/payment failure language detected", reasons, risk)
+    risk = add_category_score(original_text, normalized, attachment_keywords, 12, "Potentially risky attachment reference detected", reasons, risk)
 
     if mode == "message":
         risk = add_category_score(original_text, normalized, delivery_keywords, 18, "Delivery-related lure detected", reasons, risk)
@@ -368,6 +391,8 @@ def analyze_text_content(text: str, mode="email"):
     risk = add_category_score(original_text, normalized, promo_keywords, 12, "Prize/promotional language detected", reasons, risk)
 
     urls = extract_urls(original_text)
+    has_link = len(urls) > 0
+
     if urls:
         risk += 25
         reasons.append(f"Contains {len(urls)} link(s)")
@@ -409,7 +434,11 @@ def analyze_text_content(text: str, mode="email"):
     has_tax = any(word in normalized or word in original_text for word in tax_keywords)
     has_transport = any(word in normalized or word in original_text for word in transport_keywords)
     has_payment = any(word in normalized or word in original_text for word in payment_keywords)
-    has_link = len(urls) > 0
+    has_urgency = any(word in normalized or word in original_text for word in urgency_keywords)
+    has_action = any(word in normalized or word in original_text for word in action_keywords)
+    has_credentials = any(word in normalized or word in original_text for word in credential_keywords)
+    has_brand = any(word in normalized or word in original_text for word in brand_keywords)
+    has_threat = any(word in normalized or word in original_text for word in threat_keywords)
 
     if mode == "message" and has_transport and has_payment and has_link:
         risk += 30
@@ -422,6 +451,22 @@ def analyze_text_content(text: str, mode="email"):
     if mode == "message" and has_debt and has_link:
         risk += 25
         reasons.append("Classic debt-payment phishing pattern detected")
+
+    if mode == "email" and has_brand and has_action:
+        risk += 18
+        reasons.append("Brand name appears together with action request")
+
+    if mode == "email" and has_urgency and has_action and has_link:
+        risk += 20
+        reasons.append("Urgency + link + action request is a common phishing pattern")
+
+    if mode == "email" and has_credentials and has_link:
+        risk += 20
+        reasons.append("Credential request combined with a link is highly suspicious")
+
+    if mode == "email" and has_threat and has_link:
+        risk += 15
+        reasons.append("Threat language combined with a link is suspicious")
 
     if risk == 0:
         reasons.append("No obvious phishing indicators detected")
