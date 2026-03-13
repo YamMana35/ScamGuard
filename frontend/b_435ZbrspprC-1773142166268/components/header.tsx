@@ -21,22 +21,24 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <Image
-                src="/logo.png"
-                alt="ScamGuard logo"
-                width={34}
-                height={34}
-                className="rounded-md"
-                priority
-              />
-              <div className="absolute inset-0 blur-md bg-primary/20 -z-10 rounded-md" />
-            </div>
+            <div className="relative flex items-center justify-center">
 
-            <span className="text-xl font-bold text-foreground tracking-tight">
-              Scam<span className="text-primary">Guard</span>
-            </span>
-          </div>
+           <Image
+            src="/logo.png"
+            alt="ScamGuard logo"
+            width={48}
+            height={48}
+            priority
+            className="drop-shadow-[0_0_10px_rgba(34,197,94,0.7)]"
+         />
+
+       </div>
+
+      <span className="text-xl font-bold text-foreground tracking-tight">
+      Scam<span className="text-primary">Guard</span>
+    </span>
+ </div>
+          
 
           <nav className="hidden md:flex items-center gap-1">
             {tabs.map((tab) => {
