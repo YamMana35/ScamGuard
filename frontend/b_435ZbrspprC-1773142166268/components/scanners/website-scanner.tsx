@@ -24,7 +24,7 @@ export function WebsiteScanner() {
         setResult(null)
 
         try {
-            const response = await fetch("https://scamguard-ikr1.onrender.com/analyze", {
+            const response = await fetch("https://scamguard-docker.onrender.com/analyze", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

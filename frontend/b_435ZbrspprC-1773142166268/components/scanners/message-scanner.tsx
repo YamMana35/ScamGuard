@@ -24,7 +24,7 @@ export function MessageScanner() {
     setResult(null)
 
     try {
-      const response = await fetch("https://scamguard-ikr1.onrender.com/analyze-message", {
+      const response = await fetch("https://scamguard-docker.onrender.com/analyze-message", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
