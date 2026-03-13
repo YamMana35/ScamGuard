@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { Shield, Globe, Mail, MessageSquare, ImageIcon } from "lucide-react"
+import { Globe, Mail, MessageSquare, ImageIcon } from "lucide-react"
 
 interface HeaderProps {
   activeTab: "website" | "email" | "message" | "image"
@@ -22,23 +22,20 @@ export function Header({ activeTab, onTabChange }: HeaderProps) {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
             <div className="relative flex items-center justify-center">
+              <Image
+                src="/logo.png"
+                alt="ScamGuard logo"
+                width={56}
+                height={56}
+                priority
+                className="drop-shadow-[0_0_12px_rgba(34,197,94,0.8)]"
+              />
+            </div>
 
-           <Image
-            src="/logo.png"
-            alt="ScamGuard logo"
-            width={48}
-            height={48}
-            priority
-            className="drop-shadow-[0_0_10px_rgba(34,197,94,0.7)]"
-         />
-
-       </div>
-
-      <span className="text-xl font-bold text-foreground tracking-tight">
-      Scam<span className="text-primary">Guard</span>
-    </span>
- </div>
-          
+            <span className="text-xl font-bold text-foreground tracking-tight">
+              Scam<span className="text-primary">Guard</span>
+            </span>
+          </div>
 
           <nav className="hidden md:flex items-center gap-1">
             {tabs.map((tab) => {
