@@ -483,6 +483,8 @@ def analyze_text_content(text: str, mode="email"):
 
     trusted_link_count = 0
     untrusted_link_count = 0
+    suspicious_embedded_link_count = 0
+    dangerous_embedded_link_count = 0
 
     if urls:
         risk += 15
@@ -493,10 +495,25 @@ def analyze_text_content(text: str, mode="email"):
             normalized_url = url if lower_url.startswith("http") else f"http://{url}"
             linked_domain = extract_domain(normalized_url)
 
+            url_result = score_url(normalized_url)
+            url_risk = url_result["riskScore"]
+            url_status = url_result["status"]
+
             if is_trusted_domain(linked_domain):
                 trusted_link_count += 1
             else:
                 untrusted_link_count += 1
+
+            if url_status == "dangerous":
+                dangerous_embedded_link_count += 1
+                risk += 35
+                reasons.append(f"Embedded link looks dangerous: {linked_domain}")
+            elif url_status == "suspicious":
+                suspicious_embedded_link_count += 1
+                risk += 20
+                reasons.append(f"Embedded link looks suspicious: {linked_domain}")
+            elif url_status == "safe" and is_trusted_domain(linked_domain):
+                reasons.append(f"Embedded link points to a trusted domain: {linked_domain}")
 
             if any(shortener in lower_url for shortener in shorteners):
                 risk += 25
@@ -519,6 +536,11 @@ def analyze_text_content(text: str, mode="email"):
                 if age is not None and age < 30:
                     risk += 15
                     reasons.append("Linked domain appears newly registered")
+
+            if url_risk >= 70:
+                risk += 10
+            elif url_risk >= 40:
+                risk += 5
 
     if re.search(r'\b\d{4,8}\b', original_text):
         risk += 6
@@ -568,25 +590,33 @@ def analyze_text_content(text: str, mode="email"):
         risk += 15
         reasons.append("Threat language combined with a link is suspicious")
 
+    if mode == "email" and dangerous_embedded_link_count > 0:
+        risk += 15
+        reasons.append("At least one embedded link was classified as dangerous")
+
+    if mode == "email" and suspicious_embedded_link_count > 1:
+        risk += 10
+        reasons.append("Multiple embedded links were classified as suspicious")
+
     # False-positive reduction for legitimate security notifications
     if mode == "email":
-        if trusted_link_count > 0 and untrusted_link_count == 0:
+        if trusted_link_count > 0 and untrusted_link_count == 0 and dangerous_embedded_link_count == 0:
             risk -= 18
             reasons.append("All detected links point to trusted domains")
 
-        if has_security_notice and trusted_link_count > 0 and not has_payment and not has_debt:
+        if has_security_notice and trusted_link_count > 0 and not has_payment and not has_debt and dangerous_embedded_link_count == 0:
             risk -= 20
             reasons.append("Looks like a legitimate security notification")
 
-        if has_brand and trusted_link_count > 0 and not has_critical and not has_payment:
+        if has_brand and trusted_link_count > 0 and not has_critical and not has_payment and dangerous_embedded_link_count == 0:
             risk -= 15
             reasons.append("Brand mention appears together with trusted links only")
 
-        if "github" in normalized and trusted_link_count > 0 and "github.com" in original_text.lower():
+        if "github" in normalized and trusted_link_count > 0 and "github.com" in original_text.lower() and dangerous_embedded_link_count == 0:
             risk -= 15
             reasons.append("GitHub-related trusted links detected")
 
-        if not has_critical and trusted_link_count > 0 and untrusted_link_count == 0:
+        if not has_critical and trusted_link_count > 0 and untrusted_link_count == 0 and dangerous_embedded_link_count == 0:
             risk -= 10
             reasons.append("No critical phishing keywords detected alongside trusted links")
 
